@@ -319,7 +319,7 @@ export default function Catalogo() {
       const precoOrigFmt = p.preco_original ? Number(p.preco_original).toLocaleString('pt-MZ') + ' MZN' : null
       return precoOrigFmt ? `${p.nome} (${precoFmt}, era ${precoOrigFmt})` : `${p.nome} (${precoFmt})`
     }).join('%0A   - ')
-    const msg = encodeURIComponent(`🛒 *Novo Pedido — Tech World, Lda*\n\n👤 *Cliente:* ${form.nome}\n📞 *Tel:* ${form.telefone}\n📍 *Bairro:* ${form.bairro || 'Não informado'}\n\n🛍️ *Produto(s):*\n   - `) + prodNomes + encodeURIComponent(`\n\n📝 *Obs:* ${form.observacoes || 'Nenhuma'}\n\n_Pedido enviado via catálogo digital._`)
+    const msg = encodeURIComponent(`🛒 *Novo Pedido — Tech World, Lda*\n\n👤 *Cliente:* ${form.nome}\n📱 *Tel:* ${form.telefone}\n📍 *Bairro:* ${form.bairro || 'Não informado'}\n\n📑 *Produto(s):*\n   - `) + prodNomes + encodeURIComponent(`\n\n📝 *Obs:* ${form.observacoes || 'Nenhuma'}\n\n_Pedido enviado via catálogo digital._`)
     window.open(`https://wa.me/${WA}?text=${msg}`, '_blank')
 
     setPedidoOk(true)
