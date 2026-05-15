@@ -314,8 +314,12 @@ export default function Catalogo() {
       await supabase.from('pedidos').insert([{ cliente_id: clienteData.id, produto_id: p.id, observacoes: form.observacoes, status: 'pendente' }])
     }
 
-    const prodNomes = produtosParaPedido.map(p => p.nome).join(', ')
-    const msg = `🛒 *Novo Pedido — Tech World, Lda*%0A%0A👤 *Cliente:* ${form.nome}%0A📞 *Tel:* ${form.telefone}%0A📍 *Bairro:* ${form.bairro || 'Não informado'}%0A%0A🛍️ *Produto(s):* ${prodNomes}%0A%0A📝 *Obs:* ${form.observacoes || 'Nenhuma'}%0A%0A_Pedido enviado via catálogo digital._`
+    const prodNomes = produtosParaPedido.map(p => {
+      const precoFmt = Number(p.preco).toLocaleString('pt-MZ') + ' MZN'
+      const precoOrigFmt = p.preco_original ? Number(p.preco_original).toLocaleString('pt-MZ') + ' MZN' : null
+      return precoOrigFmt ? `${p.nome} (${precoFmt}, era ${precoOrigFmt})` : `${p.nome} (${precoFmt})`
+    }).join('%0A   - ')
+    const msg = encodeURIComponent(`🛒 *Novo Pedido — Tech World, Lda*\n\n👤 *Cliente:* ${form.nome}\n📞 *Tel:* ${form.telefone}\n📍 *Bairro:* ${form.bairro || 'Não informado'}\n\n🛍️ *Produto(s):*\n   - `) + prodNomes + encodeURIComponent(`\n\n📝 *Obs:* ${form.observacoes || 'Nenhuma'}\n\n_Pedido enviado via catálogo digital._`)
     window.open(`https://wa.me/${WA}?text=${msg}`, '_blank')
 
     setPedidoOk(true)
@@ -384,6 +388,11 @@ export default function Catalogo() {
             <div style={styles.cardBody}>
               <div style={styles.cardBrand}>{p.marca} · {p.categoria}</div>
               <div style={styles.cardName}>{p.nome}</div>
+              {p.tag === 'sale' && p.preco_original && (
+                <div style={{ fontSize: 12, color: '#a0aec0', textDecoration: 'line-through', marginBottom: 2 }}>
+                  {Number(p.preco_original).toLocaleString('pt-MZ')} MZN
+                </div>
+              )}
               <div style={styles.cardPrice}>{Number(p.preco).toLocaleString('pt-MZ')} <span style={{ fontSize: 12, fontWeight: 400, color: '#a0aec0' }}>MZN</span></div>
               {p.tag && <span style={styles.tag(p.tag)}>{p.tag === 'new' ? 'Novo' : 'Promoção'}</span>}
               {!p.disponivel && <span style={styles.indisponivel}>Esgotado</span>}
@@ -409,8 +418,18 @@ export default function Catalogo() {
                   }
                 </div>
                 <div style={{ fontSize: 13, color: '#a0aec0', marginBottom: 4 }}>{produtoSelecionado.marca} · {produtoSelecionado.categoria}</div>
+                {produtoSelecionado.tag === 'sale' && produtoSelecionado.preco_original && (
+                  <div style={{ fontSize: 15, color: '#a0aec0', textDecoration: 'line-through', marginBottom: 2 }}>
+                    {Number(produtoSelecionado.preco_original).toLocaleString('pt-MZ')} MZN
+                  </div>
+                )}
                 <div style={{ fontSize: 24, fontWeight: 600, color: '#0055A5', marginBottom: 8 }}>
                   {Number(produtoSelecionado.preco).toLocaleString('pt-MZ')} <span style={{ fontSize: 14, fontWeight: 400, color: '#a0aec0' }}>MZN</span>
+                  {produtoSelecionado.tag === 'sale' && produtoSelecionado.preco_original && (
+                    <span style={{ marginLeft: 8, fontSize: 12, background: '#fff5f5', color: '#c53030', borderRadius: 8, padding: '2px 8px', fontWeight: 500 }}>
+                      -{Math.round((1 - produtoSelecionado.preco / produtoSelecionado.preco_original) * 100)}% OFF
+                    </span>
+                  )}
                 </div>
                 {produtoSelecionado.descricao && <p style={{ fontSize: 14, color: '#718096', marginBottom: 12, lineHeight: 1.6 }}>{produtoSelecionado.descricao}</p>}
                 {produtoSelecionado.specs && (
