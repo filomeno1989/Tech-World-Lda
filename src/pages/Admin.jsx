@@ -74,6 +74,8 @@ export default function Admin() {
   const [form, setForm] = useState(formVazio)
   const [msg, setMsg] = useState('')
   const [erro, setErro] = useState('')
+  const [filtroPedido, setFiltroPedido] = useState('todos')
+  const [filtroCliente, setFiltroCliente] = useState('')
 
   function login() {
     if (senha === SENHA) { setLogado(true); setErroLogin('') }
@@ -146,6 +148,19 @@ export default function Admin() {
 
   async function atualizarStatusPedido(id, status) {
     await supabase.from('pedidos').update({ status }).eq('id', id)
+    carregarPedidos()
+  }
+
+  async function eliminarCliente(id) {
+    if (!confirm('Apagar este cliente? Os pedidos associados também serão apagados.')) return
+    await supabase.from('pedidos').delete().eq('cliente_id', id)
+    await supabase.from('clientes').delete().eq('id', id)
+    carregarClientes(); carregarPedidos()
+  }
+
+  async function eliminarPedido(id) {
+    if (!confirm('Apagar este pedido?')) return
+    await supabase.from('pedidos').delete().eq('id', id)
     carregarPedidos()
   }
 
@@ -258,7 +273,19 @@ export default function Admin() {
         {/* Pedidos */}
         {tab === 'pedidos' && (
           <div style={s.card}>
-            <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 16, marginBottom: 16 }}>Pedidos Recebidos</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 16 }}>Pedidos Recebidos</h3>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {['todos', 'pendente', 'confirmado', 'cancelado'].map(f => (
+                  <button key={f} onClick={() => setFiltroPedido(f)} style={{
+                    border: filtroPedido === f ? 'none' : '1px solid #e2e8f0',
+                    background: filtroPedido === f ? '#0055A5' : '#fff',
+                    color: filtroPedido === f ? '#fff' : '#718096',
+                    borderRadius: 20, padding: '5px 14px', fontSize: 12, cursor: 'pointer'
+                  }}>{f.charAt(0).toUpperCase() + f.slice(1)}</button>
+                ))}
+              </div>
+            </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={s.table}>
                 <thead>
@@ -273,7 +300,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pedidos.map(p => (
+                  {pedidos.filter(p => filtroPedido === 'todos' || p.status === filtroPedido).map(p => (
                     <tr key={p.id}>
                       <td style={s.td}>{new Date(p.criado_em).toLocaleDateString('pt-MZ')}</td>
                       <td style={s.td}><div style={{ fontWeight: 500 }}>{p.clientes?.nome}</div></td>
@@ -282,16 +309,19 @@ export default function Admin() {
                       <td style={s.td}>{p.clientes?.bairro || '—'}</td>
                       <td style={s.td}><span style={s.badge(p.status)}>{p.status}</span></td>
                       <td style={s.td}>
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {p.status === 'pendente' && <button style={s.btnSuccess} onClick={() => atualizarStatusPedido(p.id, 'confirmado')}>Confirmar</button>}
                           {p.status !== 'cancelado' && <button style={s.btnDanger} onClick={() => atualizarStatusPedido(p.id, 'cancelado')}>Cancelar</button>}
+                          <button style={s.btnDanger} onClick={() => eliminarPedido(p.id)}>🗑️</button>
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {pedidos.length === 0 && <p style={{ textAlign: 'center', padding: 30, color: '#a0aec0' }}>Nenhum pedido ainda.</p>}
+              {pedidos.filter(p => filtroPedido === 'todos' || p.status === filtroPedido).length === 0 && (
+                <p style={{ textAlign: 'center', padding: 30, color: '#a0aec0' }}>Nenhum pedido encontrado.</p>
+              )}
             </div>
           </div>
         )}
@@ -299,7 +329,15 @@ export default function Admin() {
         {/* Clientes */}
         {tab === 'clientes' && (
           <div style={s.card}>
-            <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 16, marginBottom: 16 }}>Clientes Registados</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 16 }}>Clientes Registados</h3>
+              <input
+                placeholder="🔍 Pesquisar por nome, tel, bairro..."
+                value={filtroCliente}
+                onChange={e => setFiltroCliente(e.target.value)}
+                style={{ padding: '7px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: '#f4f6f9', outline: 'none', minWidth: 240 }}
+              />
+            </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={s.table}>
                 <thead>
@@ -309,21 +347,35 @@ export default function Admin() {
                     <th style={s.th}>WhatsApp</th>
                     <th style={s.th}>Bairro</th>
                     <th style={s.th}>Registado em</th>
+                    <th style={s.th}>Ação</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {clientes.map(c => (
+                  {clientes.filter(c => {
+                    if (!filtroCliente) return true
+                    const q = filtroCliente.toLowerCase()
+                    return c.nome?.toLowerCase().includes(q) || c.telefone?.includes(q) || c.bairro?.toLowerCase().includes(q)
+                  }).map(c => (
                     <tr key={c.id}>
                       <td style={s.td}><div style={{ fontWeight: 500 }}>{c.nome}</div></td>
                       <td style={s.td}>{c.telefone}</td>
                       <td style={s.td}>{c.whatsapp || '—'}</td>
                       <td style={s.td}>{c.bairro || '—'}</td>
                       <td style={s.td}>{new Date(c.criado_em).toLocaleDateString('pt-MZ')}</td>
+                      <td style={s.td}>
+                        <button style={s.btnDanger} onClick={() => eliminarCliente(c.id)}>🗑️ Apagar</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {clientes.length === 0 && <p style={{ textAlign: 'center', padding: 30, color: '#a0aec0' }}>Nenhum cliente ainda.</p>}
+              {clientes.filter(c => {
+                if (!filtroCliente) return true
+                const q = filtroCliente.toLowerCase()
+                return c.nome?.toLowerCase().includes(q) || c.telefone?.includes(q) || c.bairro?.toLowerCase().includes(q)
+              }).length === 0 && (
+                <p style={{ textAlign: 'center', padding: 30, color: '#a0aec0' }}>Nenhum cliente encontrado.</p>
+              )}
             </div>
           </div>
         )}
