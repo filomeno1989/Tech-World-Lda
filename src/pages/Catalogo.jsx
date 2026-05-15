@@ -255,6 +255,7 @@ export default function Catalogo() {
   const [enviando, setEnviando] = useState(false)
   const [pedidoOk, setPedidoOk] = useState(false)
   const [erro, setErro] = useState('')
+  const [boasVindas, setBoasVindas] = useState(true)
 
   useEffect(() => {
     carregarProdutos()
@@ -319,7 +320,7 @@ export default function Catalogo() {
       const precoOrigFmt = p.preco_original ? Number(p.preco_original).toLocaleString('pt-MZ') + ' MZN' : null
       return precoOrigFmt ? `${p.nome} (${precoFmt}, era ${precoOrigFmt})` : `${p.nome} (${precoFmt})`
     }).join('%0A   - ')
-    const msg = encodeURIComponent(`🛒 *Novo Pedido — Tech World, Lda*\n\n👤 *Cliente:* ${form.nome}\n📱 *Tel:* ${form.telefone}\n📍 *Bairro:* ${form.bairro || 'Não informado'}\n\n📑 *Produto(s):*\n   - `) + prodNomes + encodeURIComponent(`\n\n📝 *Obs:* ${form.observacoes || 'Nenhuma'}\n\n_Pedido enviado via catálogo digital._`)
+    const msg = encodeURIComponent(`🛒 *Novo Pedido — Tech World, Lda*\n\n👤 *Cliente:* ${form.nome}\n📞 *Tel:* ${form.telefone}\n📍 *Bairro:* ${form.bairro || 'Não informado'}\n\n🛍️ *Produto(s):*\n   - `) + prodNomes + encodeURIComponent(`\n\n📝 *Obs:* ${form.observacoes || 'Nenhuma'}\n\n_Pedido enviado via catálogo digital._`)
     window.open(`https://wa.me/${WA}?text=${msg}`, '_blank')
 
     setPedidoOk(true)
@@ -585,6 +586,46 @@ export default function Catalogo() {
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Boas-Vindas */}
+      {boasVindas && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 420, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ background: 'linear-gradient(135deg, #0055A5 0%, #003d7a 100%)', padding: '32px 28px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>🏪</div>
+              <h2 style={{ color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 20, marginBottom: 6 }}>Bem-vindo à Tech World, Lda</h2>
+              <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, lineHeight: 1.5 }}>O seu catálogo digital — Beira</p>
+            </div>
+            <div style={{ padding: '24px 28px' }}>
+              <p style={{ fontSize: 14, color: '#4a5568', marginBottom: 20, lineHeight: 1.7, textAlign: 'center' }}>
+                Explore os nossos produtos, veja preços e detalhes — e faça o seu pedido directamente pelo WhatsApp. A nossa equipa confirma e trata do delivery! 🚀
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {[
+                  { icon: '🔍', texto: 'Pesquise por produto ou categoria' },
+                  { icon: '📋', texto: 'Veja detalhes e especificações' },
+                  { icon: '🛒', texto: 'Faça o seu pedido facilmente' },
+                  { icon: '📲', texto: 'Receba confirmação via WhatsApp' },
+                ].map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f4f6f9', borderRadius: 10, padding: '10px 14px' }}>
+                    <span style={{ fontSize: 20 }}>{item.icon}</span>
+                    <span style={{ fontSize: 13, color: '#4a5568' }}>{item.texto}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setBoasVindas(false)}
+                style={{ background: '#0055A5', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 20px', width: '100%', fontSize: 15, fontFamily: 'Sora, sans-serif', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Explorar o Catálogo 🛍️
+              </button>
+              <p style={{ textAlign: 'center', fontSize: 11, color: '#a0aec0', marginTop: 12 }}>
+                Horário de atendimento: Seg–Sáb, 08h–18h
+              </p>
+            </div>
           </div>
         </div>
       )}
