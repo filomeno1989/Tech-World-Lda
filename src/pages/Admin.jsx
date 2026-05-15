@@ -58,7 +58,7 @@ const s = {
   sucesso: { background: '#f0fff4', color: '#276749', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 },
 }
 
-const formVazio = { nome: '', marca: '', categoria: 'Telemóveis', preco: '', descricao: '', foto_url: '', disponivel: true, tag: '', specs: '' }
+const formVazio = { nome: '', marca: '', categoria: 'Telemóveis', preco: '', preco_original: '', descricao: '', foto_url: '', disponivel: true, tag: '', specs: '' }
 
 export default function Admin() {
   const [logado, setLogado] = useState(false)
@@ -104,7 +104,7 @@ export default function Admin() {
   function abrirModal(p = null) {
     setEditando(p)
     if (p) {
-      setForm({ nome: p.nome || '', marca: p.marca || '', categoria: p.categoria || 'Telemóveis', preco: p.preco || '', descricao: p.descricao || '', foto_url: p.foto_url || '', disponivel: p.disponivel !== false, tag: p.tag || '', specs: p.specs ? JSON.stringify(p.specs, null, 2) : '' })
+      setForm({ nome: p.nome || '', marca: p.marca || '', categoria: p.categoria || 'Telemóveis', preco: p.preco || '', preco_original: p.preco_original || '', descricao: p.descricao || '', foto_url: p.foto_url || '', disponivel: p.disponivel !== false, tag: p.tag || '', specs: p.specs ? JSON.stringify(p.specs, null, 2) : '' })
     } else {
       setForm(formVazio)
     }
@@ -119,7 +119,7 @@ export default function Admin() {
     if (form.specs.trim()) {
       try { specsObj = JSON.parse(form.specs) } catch { setErro('Especificações com formato inválido. Use JSON válido.'); return }
     }
-    const dados = { nome: form.nome, marca: form.marca, categoria: form.categoria, preco: parseFloat(form.preco), descricao: form.descricao, foto_url: form.foto_url, disponivel: form.disponivel, tag: form.tag, specs: specsObj }
+    const dados = { nome: form.nome, marca: form.marca, categoria: form.categoria, preco: parseFloat(form.preco), preco_original: form.preco_original ? parseFloat(form.preco_original) : null, descricao: form.descricao, foto_url: form.foto_url, disponivel: form.disponivel, tag: form.tag, specs: specsObj }
     if (editando) {
       const { error } = await supabase.from('produtos').update(dados).eq('id', editando.id)
       if (error) { setErro('Erro ao atualizar.'); return }
@@ -348,7 +348,9 @@ export default function Admin() {
               {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <label style={s.label}>Preço (MZN) *</label>
-            <input style={s.input} type="number" placeholder="Ex: 12500" value={form.preco} onChange={e => setForm({ ...form, preco: e.target.value })} />
+            <input style={s.input} type="number" placeholder="Ex: 12500 (preço actual de venda)" value={form.preco} onChange={e => setForm({ ...form, preco: e.target.value })} />
+            <label style={s.label}>Preço original (MZN) — só para promoções</label>
+            <input style={s.input} type="number" placeholder="Ex: 15000 (será riscado no catálogo)" value={form.preco_original} onChange={e => setForm({ ...form, preco_original: e.target.value })} />
             <label style={s.label}>Descrição</label>
             <textarea style={s.textarea} placeholder="Descrição do produto..." value={form.descricao} onChange={e => setForm({ ...form, descricao: e.target.value })} />
             <label style={s.label}>URL da foto (link direto da imagem)</label>
