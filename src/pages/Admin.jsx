@@ -56,6 +56,18 @@ const s = {
   statLabel: { fontSize: 12, color: '#a0aec0', marginTop: 4 },
   erro: { background: '#fff5f5', color: '#c53030', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 },
   sucesso: { background: '#f0fff4', color: '#276749', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 },
+  filterBar: { display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' },
+  filterInput: { padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: '#f4f6f9', outline: 'none', flex: 1, minWidth: 180 },
+  filterBtn: (active) => ({
+    border: active ? 'none' : '1px solid #e2e8f0',
+    background: active ? '#0055A5' : '#fff',
+    color: active ? '#fff' : '#718096',
+    borderRadius: 8,
+    padding: '7px 16px',
+    fontSize: 13,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  }),
 }
 
 const formVazio = { nome: '', marca: '', categoria: 'Telemóveis', preco: '', preco_original: '', descricao: '', foto_url: '', disponivel: true, tag: '', specs: '' }
@@ -74,6 +86,8 @@ export default function Admin() {
   const [form, setForm] = useState(formVazio)
   const [msg, setMsg] = useState('')
   const [erro, setErro] = useState('')
+
+  // Filtros
   const [filtroPedido, setFiltroPedido] = useState('todos')
   const [filtroCliente, setFiltroCliente] = useState('')
 
@@ -94,7 +108,10 @@ export default function Admin() {
   }
 
   async function carregarPedidos() {
-    const { data } = await supabase.from('pedidos').select(`*, clientes(nome, telefone, bairro), produtos(nome, preco)`).order('criado_em', { ascending: false })
+    const { data } = await supabase
+      .from('pedidos')
+      .select(`*, produtos(nome, preco)`)
+      .order('criado_em', { ascending: false })
     setPedidos(data || [])
   }
 
@@ -151,18 +168,38 @@ export default function Admin() {
     carregarPedidos()
   }
 
-  async function eliminarCliente(id) {
-    if (!confirm('Apagar este cliente? Os pedidos associados também serão apagados.')) return
-    await supabase.from('pedidos').delete().eq('cliente_id', id)
-    await supabase.from('clientes').delete().eq('id', id)
-    carregarClientes(); carregarPedidos()
-  }
-
   async function eliminarPedido(id) {
-    if (!confirm('Apagar este pedido?')) return
+    if (!confirm('Eliminar este pedido?')) return
     await supabase.from('pedidos').delete().eq('id', id)
     carregarPedidos()
   }
+
+  // Apagar cliente SEM apagar pedidos
+  async function eliminarCliente(id) {
+    if (!confirm('Apagar este cliente? Os pedidos dele ficam guardados.')) return
+    // Remove a ligação cliente_id nos pedidos deste cliente antes de apagar
+    await supabase.from('pedidos').update({ cliente_id: null }).eq('cliente_id', id)
+    await supabase.from('clientes').delete().eq('id', id)
+    carregarClientes()
+    carregarPedidos()
+  }
+
+  // Pedidos filtrados
+  const pedidosFiltrados = pedidos.filter(p => {
+    if (filtroPedido === 'todos') return true
+    return p.status === filtroPedido
+  })
+
+  // Clientes filtrados
+  const clientesFiltrados = clientes.filter(c => {
+    if (!filtroCliente.trim()) return true
+    const q = filtroCliente.toLowerCase()
+    return (
+      c.nome?.toLowerCase().includes(q) ||
+      c.telefone?.includes(q) ||
+      c.bairro?.toLowerCase().includes(q)
+    )
+  })
 
   if (!logado) {
     return (
@@ -245,7 +282,10 @@ export default function Admin() {
                           <div style={{ fontSize: 11, color: '#a0aec0' }}>{p.marca}</div>
                         </td>
                         <td style={s.td}>{p.categoria}</td>
-                        <td style={s.td}>{Number(p.preco).toLocaleString('pt-MZ')}</td>
+                        <td style={s.td}>
+                          {p.preco_original && <div style={{ fontSize: 11, color: '#a0aec0', textDecoration: 'line-through' }}>{Number(p.preco_original).toLocaleString('pt-MZ')}</div>}
+                          {Number(p.preco).toLocaleString('pt-MZ')}
+                        </td>
                         <td style={s.td}>
                           <span style={s.badge(p.disponivel ? 'confirmado' : 'cancelado')}>
                             {p.disponivel ? 'Disponível' : 'Esgotado'}
@@ -273,19 +313,25 @@ export default function Admin() {
         {/* Pedidos */}
         {tab === 'pedidos' && (
           <div style={s.card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 16 }}>Pedidos Recebidos</h3>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {['todos', 'pendente', 'confirmado', 'cancelado'].map(f => (
-                  <button key={f} onClick={() => setFiltroPedido(f)} style={{
-                    border: filtroPedido === f ? 'none' : '1px solid #e2e8f0',
-                    background: filtroPedido === f ? '#0055A5' : '#fff',
-                    color: filtroPedido === f ? '#fff' : '#718096',
-                    borderRadius: 20, padding: '5px 14px', fontSize: 12, cursor: 'pointer'
-                  }}>{f.charAt(0).toUpperCase() + f.slice(1)}</button>
-                ))}
-              </div>
+              <span style={{ fontSize: 13, color: '#718096' }}>{pedidosFiltrados.length} pedido(s)</span>
             </div>
+
+            {/* Filtro de pedidos */}
+            <div style={s.filterBar}>
+              {['todos', 'pendente', 'confirmado', 'cancelado'].map(f => (
+                <button key={f} style={s.filterBtn(filtroPedido === f)} onClick={() => setFiltroPedido(f)}>
+                  {f === 'todos' ? '📋 Todos' : f === 'pendente' ? '⏳ Pendentes' : f === 'confirmado' ? '✅ Confirmados' : '❌ Cancelados'}
+                  {f !== 'todos' && (
+                    <span style={{ marginLeft: 6, background: 'rgba(0,0,0,0.1)', borderRadius: 10, padding: '1px 6px', fontSize: 11 }}>
+                      {pedidos.filter(p => p.status === f).length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
             <div style={{ overflowX: 'auto' }}>
               <table style={s.table}>
                 <thead>
@@ -300,16 +346,16 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pedidos.filter(p => filtroPedido === 'todos' || p.status === filtroPedido).map(p => (
+                  {pedidosFiltrados.map(p => (
                     <tr key={p.id}>
                       <td style={s.td}>{new Date(p.criado_em).toLocaleDateString('pt-MZ')}</td>
-                      <td style={s.td}><div style={{ fontWeight: 500 }}>{p.clientes?.nome}</div></td>
-                      <td style={s.td}>{p.clientes?.telefone}</td>
+                      <td style={s.td}><div style={{ fontWeight: 500 }}>{p.cliente_nome || '—'}</div></td>
+                      <td style={s.td}>{p.cliente_telefone || '—'}</td>
                       <td style={s.td}>{p.produtos?.nome}</td>
-                      <td style={s.td}>{p.clientes?.bairro || '—'}</td>
+                      <td style={s.td}>{p.cliente_bairro || '—'}</td>
                       <td style={s.td}><span style={s.badge(p.status)}>{p.status}</span></td>
                       <td style={s.td}>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 6 }}>
                           {p.status === 'pendente' && <button style={s.btnSuccess} onClick={() => atualizarStatusPedido(p.id, 'confirmado')}>Confirmar</button>}
                           {p.status !== 'cancelado' && <button style={s.btnDanger} onClick={() => atualizarStatusPedido(p.id, 'cancelado')}>Cancelar</button>}
                           <button style={s.btnDanger} onClick={() => eliminarPedido(p.id)}>🗑️</button>
@@ -319,8 +365,10 @@ export default function Admin() {
                   ))}
                 </tbody>
               </table>
-              {pedidos.filter(p => filtroPedido === 'todos' || p.status === filtroPedido).length === 0 && (
-                <p style={{ textAlign: 'center', padding: 30, color: '#a0aec0' }}>Nenhum pedido encontrado.</p>
+              {pedidosFiltrados.length === 0 && (
+                <p style={{ textAlign: 'center', padding: 30, color: '#a0aec0' }}>
+                  {filtroPedido === 'todos' ? 'Nenhum pedido ainda.' : `Nenhum pedido ${filtroPedido}.`}
+                </p>
               )}
             </div>
           </div>
@@ -329,15 +377,24 @@ export default function Admin() {
         {/* Clientes */}
         {tab === 'clientes' && (
           <div style={s.card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 16 }}>Clientes Registados</h3>
+              <span style={{ fontSize: 13, color: '#718096' }}>{clientesFiltrados.length} cliente(s)</span>
+            </div>
+
+            {/* Filtro de clientes */}
+            <div style={s.filterBar}>
               <input
-                placeholder="🔍 Pesquisar por nome, tel, bairro..."
+                style={s.filterInput}
+                placeholder="🔍  Pesquisar por nome, telefone ou bairro..."
                 value={filtroCliente}
                 onChange={e => setFiltroCliente(e.target.value)}
-                style={{ padding: '7px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: '#f4f6f9', outline: 'none', minWidth: 240 }}
               />
+              {filtroCliente && (
+                <button style={s.btnDanger} onClick={() => setFiltroCliente('')}>Limpar</button>
+              )}
             </div>
+
             <div style={{ overflowX: 'auto' }}>
               <table style={s.table}>
                 <thead>
@@ -351,11 +408,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {clientes.filter(c => {
-                    if (!filtroCliente) return true
-                    const q = filtroCliente.toLowerCase()
-                    return c.nome?.toLowerCase().includes(q) || c.telefone?.includes(q) || c.bairro?.toLowerCase().includes(q)
-                  }).map(c => (
+                  {clientesFiltrados.map(c => (
                     <tr key={c.id}>
                       <td style={s.td}><div style={{ fontWeight: 500 }}>{c.nome}</div></td>
                       <td style={s.td}>{c.telefone}</td>
@@ -369,12 +422,10 @@ export default function Admin() {
                   ))}
                 </tbody>
               </table>
-              {clientes.filter(c => {
-                if (!filtroCliente) return true
-                const q = filtroCliente.toLowerCase()
-                return c.nome?.toLowerCase().includes(q) || c.telefone?.includes(q) || c.bairro?.toLowerCase().includes(q)
-              }).length === 0 && (
-                <p style={{ textAlign: 'center', padding: 30, color: '#a0aec0' }}>Nenhum cliente encontrado.</p>
+              {clientesFiltrados.length === 0 && (
+                <p style={{ textAlign: 'center', padding: 30, color: '#a0aec0' }}>
+                  {filtroCliente ? 'Nenhum cliente encontrado.' : 'Nenhum cliente ainda.'}
+                </p>
               )}
             </div>
           </div>
@@ -399,8 +450,8 @@ export default function Admin() {
             <select style={s.select} value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}>
               {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <label style={s.label}>Preço (MZN) *</label>
-            <input style={s.input} type="number" placeholder="Ex: 12500 (preço actual de venda)" value={form.preco} onChange={e => setForm({ ...form, preco: e.target.value })} />
+            <label style={s.label}>Preço actual (MZN) *</label>
+            <input style={s.input} type="number" placeholder="Ex: 12500" value={form.preco} onChange={e => setForm({ ...form, preco: e.target.value })} />
             <label style={s.label}>Preço original (MZN) — só para promoções</label>
             <input style={s.input} type="number" placeholder="Ex: 15000 (será riscado no catálogo)" value={form.preco_original} onChange={e => setForm({ ...form, preco_original: e.target.value })} />
             <label style={s.label}>Descrição</label>
