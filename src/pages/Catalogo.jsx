@@ -172,6 +172,7 @@ const styles = {
     fontFamily: 'Sora, sans-serif',
     fontWeight: 600,
     marginTop: 16,
+    cursor: 'pointer',
   },
   btnSecondary: {
     background: '#f4f6f9',
@@ -183,6 +184,7 @@ const styles = {
     fontSize: 14,
     fontFamily: 'DM Sans, sans-serif',
     marginTop: 8,
+    cursor: 'pointer',
   },
   formGroup: { marginBottom: 14 },
   formLabel: { fontSize: 13, color: '#718096', display: 'block', marginBottom: 4 },
@@ -302,25 +304,67 @@ export default function Catalogo() {
     setEnviando(true)
     setErro('')
 
-    const { data: clienteData, error: clienteError } = await supabase
+    // Verificar se cliente já existe pelo telefone — evita duplicados
+    let clienteId = null
+    const telLimpo = form.telefone.trim().replace(/\s/g, '')
+    const { data: clienteExistente } = await supabase
       .from('clientes')
-      .insert([{ nome: form.nome, telefone: form.telefone, whatsapp: form.whatsapp || form.telefone, bairro: form.bairro }])
-      .select()
-      .single()
+      .select('id')
+      .eq('telefone', telLimpo)
+      .maybeSingle()
 
-    if (clienteError) { setErro('Erro ao registar cliente. Tenta novamente.'); setEnviando(false); return }
-
-    const produtosParaPedido = produtoSelecionado ? [produtoSelecionado] : carrinho
-    for (const p of produtosParaPedido) {
-      await supabase.from('pedidos').insert([{ cliente_id: clienteData.id, produto_id: p.id, observacoes: form.observacoes, status: 'pendente' }])
+    if (clienteExistente) {
+      // Cliente já existe — usa o id existente e actualiza dados
+      clienteId = clienteExistente.id
+      await supabase
+        .from('clientes')
+        .update({ nome: form.nome, whatsapp: form.whatsapp || telLimpo, bairro: form.bairro })
+        .eq('id', clienteId)
+    } else {
+      // Cliente novo — cria registo
+      const { data: novoCliente, error: clienteError } = await supabase
+        .from('clientes')
+        .insert([{ nome: form.nome, telefone: telLimpo, whatsapp: form.whatsapp || telLimpo, bairro: form.bairro }])
+        .select()
+        .single()
+      if (clienteError) {
+        setErro('Erro ao registar cliente. Tenta novamente.')
+        setEnviando(false)
+        return
+      }
+      clienteId = novoCliente.id
     }
 
+    // Inserir pedidos — guarda também os dados do cliente directamente no pedido
+    const produtosParaPedido = produtoSelecionado ? [produtoSelecionado] : carrinho
+    for (const p of produtosParaPedido) {
+      await supabase.from('pedidos').insert([{
+        cliente_id: clienteId,
+        produto_id: p.id,
+        observacoes: form.observacoes,
+        status: 'pendente',
+        cliente_nome: form.nome,
+        cliente_telefone: telLimpo,
+        cliente_bairro: form.bairro,
+      }])
+    }
+
+    // Mensagem WhatsApp
     const prodNomes = produtosParaPedido.map(p => {
       const precoFmt = Number(p.preco).toLocaleString('pt-MZ') + ' MZN'
       const precoOrigFmt = p.preco_original ? Number(p.preco_original).toLocaleString('pt-MZ') + ' MZN' : null
       return precoOrigFmt ? `${p.nome} (${precoFmt}, era ${precoOrigFmt})` : `${p.nome} (${precoFmt})`
-    }).join('%0A   - ')
-    const msg = encodeURIComponent(`🛒 *Novo Pedido — Tech World, Lda*\n\n👤 *Cliente:* ${form.nome}\n📞 *Tel:* ${form.telefone}\n📍 *Bairro:* ${form.bairro || 'Não informado'}\n\n🛍️ *Produto(s):*\n   - `) + prodNomes + encodeURIComponent(`\n\n📝 *Obs:* ${form.observacoes || 'Nenhuma'}\n\n_Pedido enviado via catálogo digital._`)
+    }).join('\n   - ')
+
+    const msg = encodeURIComponent(
+      `🛒 *Novo Pedido — Tech World, Lda*\n\n` +
+      `👤 *Cliente:* ${form.nome}\n` +
+      `📞 *Tel:* ${telLimpo}\n` +
+      `📍 *Bairro:* ${form.bairro || 'Não informado'}\n\n` +
+      `🛍️ *Produto(s):*\n   - ${prodNomes}\n\n` +
+      `📝 *Obs:* ${form.observacoes || 'Nenhuma'}\n\n` +
+      `_Pedido enviado via catálogo digital._`
+    )
     window.open(`https://wa.me/${WA}?text=${msg}`, '_blank')
 
     setPedidoOk(true)
@@ -538,7 +582,7 @@ export default function Catalogo() {
                           <div style={{ fontSize: 14, fontWeight: 500 }}>{p.nome}</div>
                           <div style={{ fontSize: 13, color: '#718096' }}>{Number(p.preco).toLocaleString('pt-MZ')} MZN</div>
                         </div>
-                        <button onClick={() => removerCarrinho(p.id)} style={{ background: '#fff5f5', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#c53030', fontSize: 12 }}>Remover</button>
+                        <button onClick={() => removerCarrinho(p.id)} style={{ background: '#fff5f5', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#c53030', fontSize: 12, cursor: 'pointer' }}>Remover</button>
                       </div>
                     ))}
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', fontWeight: 600, fontSize: 15 }}>
